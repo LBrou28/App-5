@@ -1,0 +1,32 @@
+# Firebase data and callable contracts
+
+## Firestore layout
+
+- `users/{uid}`: `householdIds` (managed by server).
+- `users/{uid}/favorites/{id}`: `householdId`, `itemId`.
+- `households/{householdId}`: `name`, `ownerId`, `createdAt`.
+- `households/{householdId}/members/{uid}`: `role`, `joinedAt`.
+- `households/{householdId}/locations/{locationId}`: `room`, `container`, optional `parentId`.
+- `households/{householdId}/items/{itemId}`: `name`, `category`, `locationId`, `notes`, optional `photoPath`, `activeLoanId` (null when available).
+- `households/{householdId}/loans/{loanId}`: `itemId`, `borrower`, `recordedBy`, `dueDate`, `borrowedAt`, `returnedAt`.
+
+Photo object path: `households/{householdId}/items/{itemId}/{fileName}`. Prefer authenticated Storage SDK reads when photos must remain private; do not distribute permanent download-token URLs.
+
+## Implemented functions
+
+All require Firebase Authentication. Default region: us-central1.
+
+- `createHousehold({name})` returns `{householdId}` and creates owner membership.
+- `borrowItem({householdId, itemId, borrower, dueDate})` returns `{loanId}`. dueDate is epoch milliseconds, future and within 366 days. Checks membership and item existence and atomically prevents a second active loan.
+- `returnItem({householdId, itemId})` returns `{returned: true}`. Checks membership, marks loan returned and clears active loan atomically; history remains.
+
+## Next functions to implement
+
+Student 1: create/update/delete items and coordinate photo lifecycle.
+Student 2: create/update/delete locations and move items; protect nonempty locations.
+Student 3: household-scoped read queries, user favorites and scalable search if needed. For a small initial inventory, local search over loaded household items supports substring search in names and notes.
+Student 4: server-validated household invitation/join/leave flows, account screens and reminders. Handle leaving the last owner and revoking access.
+
+## Security and tests
+
+Client Security Rules deny shared writes and allow reads only to members. Favorites are private to the user; writes validate household membership and item existence. Storage rules allow member image uploads under 5 MB. Add emulator integration tests covering outsider denial, malformed writes, concurrent loans, stale membership and returns before live deployment. Current server tests verify input guards only; they do not replace emulator tests.

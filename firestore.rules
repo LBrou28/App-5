@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function member(householdId) {
+      return request.auth != null && exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
+    }
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+      match /favorites/{favoriteId} {
+        allow read, delete: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['householdId', 'itemId'])
+          && member(request.resource.data.householdId)
+          && exists(/databases/$(database)/documents/households/$(request.resource.data.householdId)/items/$(request.resource.data.itemId));
+      }
+    }
+    match /households/{householdId} {
+      allow read: if member(householdId);
+      allow write: if false;
+      match /{collection}/{documentId} {
+        allow read: if member(householdId) && collection in ['members', 'items', 'locations', 'loans'];
+        allow write: if false; // Shared mutations go through validated Cloud Functions.
+      }
+    }
+  }
+}
