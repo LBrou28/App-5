@@ -1,6 +1,6 @@
 # App-5
 
-Flutter household inventory project with Firebase scaffolding retained for future development. The first feature area is `lib/features/items/`: an item model and empty inventory screen. Firebase is not connected yet.
+Flutter household inventory project with Firebase scaffolding retained for future development. The first feature area is `lib/features/items/`: an item model, inventory list, add-item form, and a basic details dialog. Name is required; category and notes are optional. Items remain in memory for the current session. Firebase is not connected yet; persistence, photos, edit/delete, and locations are future work.
 
 ## Run
 
