@@ -1,6 +1,6 @@
 # App-5
 
-Standard Flutter starter application with Firebase scaffolding retained for future development. The app currently displays Flutter's default counter screen. No inventory screens or feature implementations are connected to the app.
+Flutter household inventory project with Firebase scaffolding retained for future development. The first feature area is `lib/features/items/`: an item model and empty inventory screen. Firebase is not connected yet.
 
 ## Run
 
