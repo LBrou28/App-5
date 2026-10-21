@@ -16,6 +16,19 @@ function text(value: unknown, name: string): string {
   catch { throw new HttpsError('invalid-argument', `${name} is required and must be a valid identifier or name.`); }
 }
 
+function locationKind(value: unknown): 'room' | 'container' {
+  if (value === 'room' || value === 'container') return value;
+  throw new HttpsError('invalid-argument', 'kind must be room or container.');
+}
+
+async function requireMember(householdId: string, userId: string) {
+  const household = db.collection('households').doc(householdId);
+  if (!(await household.collection('members').doc(userId).get()).exists) {
+    throw new HttpsError('permission-denied', 'Join this household first.');
+  }
+  return household;
+}
+
 export const createHousehold = onCall(async (request) => {
   const userId = uid(request.auth);
   const name = text(request.data?.name, 'name');
@@ -73,4 +86,56 @@ export const returnItem = onCall(async (request) => {
     transaction.update(item, { activeLoanId: null });
   });
   return { returned: true };
+});
+
+export const createLocation = onCall(async (request) => {
+  const userId = uid(request.auth);
+  const householdId = text(request.data?.householdId, 'householdId');
+  const name = text(request.data?.name, 'name');
+  const kind = locationKind(request.data?.kind);
+  const household = await requireMember(householdId, userId);
+  const parentId = request.data?.parentId;
+  if (kind === 'container') {
+    const parent = typeof parentId === 'string' ? await household.collection('locations').doc(parentId).get() : undefined;
+    if (parent?.data()?.kind !== 'room') {
+      throw new HttpsError('failed-precondition', 'A container must belong to an existing room.');
+    }
+  } else if (parentId != null) throw new HttpsError('invalid-argument', 'Rooms cannot have a parent.');
+  const location = household.collection('locations').doc();
+  await location.set({ name, kind, parentId: kind === 'container' ? parentId : null, createdAt: FieldValue.serverTimestamp() });
+  return { locationId: location.id };
+});
+
+export const renameLocation = onCall(async (request) => {
+  const userId = uid(request.auth); const householdId = text(request.data?.householdId, 'householdId');
+  const locationId = text(request.data?.locationId, 'locationId'); const name = text(request.data?.name, 'name');
+  const household = await requireMember(householdId, userId); const location = household.collection('locations').doc(locationId);
+  if (!(await location.get()).exists) throw new HttpsError('not-found', 'Location not found.');
+  await location.update({ name, updatedAt: FieldValue.serverTimestamp() }); return { renamed: true };
+});
+
+export const deleteLocation = onCall(async (request) => {
+  const userId = uid(request.auth); const householdId = text(request.data?.householdId, 'householdId'); const locationId = text(request.data?.locationId, 'locationId');
+  const household = await requireMember(householdId, userId); const location = household.collection('locations').doc(locationId);
+  await db.runTransaction(async (transaction) => {
+    const [locationSnapshot, items, children] = await Promise.all([
+      transaction.get(location), transaction.get(household.collection('items').where('locationId', '==', locationId).limit(1)),
+      transaction.get(household.collection('locations').where('parentId', '==', locationId).limit(1)),
+    ]);
+    if (!locationSnapshot.exists) throw new HttpsError('not-found', 'Location not found.');
+    if (!items.empty || !children.empty) throw new HttpsError('failed-precondition', 'Move items and containers before deleting this location.');
+    transaction.delete(location);
+  }); return { deleted: true };
+});
+
+export const moveItem = onCall(async (request) => {
+  const userId = uid(request.auth); const householdId = text(request.data?.householdId, 'householdId'); const itemId = text(request.data?.itemId, 'itemId');
+  const locationId = request.data?.locationId; if (locationId != null && typeof locationId !== 'string') throw new HttpsError('invalid-argument', 'locationId must be a string or null.');
+  const household = await requireMember(householdId, userId); const item = household.collection('items').doc(itemId);
+  await db.runTransaction(async (transaction) => {
+    const [itemSnapshot, locationSnapshot] = await Promise.all([transaction.get(item), locationId == null ? Promise.resolve(undefined) : transaction.get(household.collection('locations').doc(locationId))]);
+    if (!itemSnapshot.exists) throw new HttpsError('not-found', 'Item not found.');
+    if (locationId != null && !locationSnapshot?.exists) throw new HttpsError('not-found', 'Destination location not found.');
+    transaction.update(item, { locationId: locationId ?? null, updatedAt: FieldValue.serverTimestamp() });
+  }); return { moved: true };
 });

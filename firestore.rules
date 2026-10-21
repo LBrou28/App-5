@@ -1,27 +1,57 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
     function member(householdId) {
-      return request.auth != null && exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
+      return signedIn() && exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
     }
+    function owner(householdId) {
+      return member(householdId) && get(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid)).data.role == 'owner';
+    }
+    function validName(value) { return value is string && value.size() > 0 && value.size() <= 200 && !value.matches('.*/.*'); }
+
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false;
+      allow read, create, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
       match /favorites/{favoriteId} {
-        allow read, delete: if request.auth != null && request.auth.uid == userId;
-        allow create, update: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.keys().hasOnly(['householdId', 'itemId'])
-          && member(request.resource.data.householdId)
-          && exists(/databases/$(database)/documents/households/$(request.resource.data.householdId)/items/$(request.resource.data.itemId));
+        allow read, delete: if signedIn() && request.auth.uid == userId;
+        allow create, update: if signedIn() && request.auth.uid == userId
+          && member(request.resource.data.householdId);
       }
     }
+
     match /households/{householdId} {
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid && validName(request.resource.data.name);
       allow read: if member(householdId);
-      allow write: if false;
-      match /{collection}/{documentId} {
-        allow read: if member(householdId) && collection in ['members', 'items', 'locations', 'loans'];
-        allow write: if false; // Shared mutations go through validated Cloud Functions.
+      allow update, delete: if false;
+
+      match /members/{userId} {
+        allow read: if member(householdId);
+        allow create: if signedIn() && request.resource.data.role in ['owner', 'member']
+          && ((userId == request.auth.uid && getAfter(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid) || owner(householdId));
+        allow update, delete: if owner(householdId);
       }
+
+      match /locations/{locationId} {
+        allow read: if member(householdId);
+        allow create: if member(householdId) && validName(request.resource.data.name)
+          && request.resource.data.kind in ['room', 'container']
+          && request.resource.data.itemCount == 0 && request.resource.data.childCount == 0
+          && ((request.resource.data.kind == 'room' && request.resource.data.parentId == null)
+            || (request.resource.data.kind == 'container' && request.resource.data.parentId is string
+              && get(/databases/$(database)/documents/households/$(householdId)/locations/$(request.resource.data.parentId)).data.kind == 'room'));
+        allow update: if member(householdId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'itemCount', 'childCount', 'updatedAt'])
+          && (request.resource.data.name == resource.data.name || validName(request.resource.data.name));
+        allow delete: if member(householdId) && resource.data.itemCount == 0 && resource.data.childCount == 0;
+      }
+
+      match /items/{itemId} {
+        allow read: if member(householdId);
+        allow create, delete: if member(householdId);
+        allow update: if member(householdId);
+      }
+
+      match /loans/{loanId} { allow read, write: if member(householdId); }
     }
   }
 }

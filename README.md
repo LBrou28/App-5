@@ -1,6 +1,10 @@
 # App-5
 
-Standard Flutter starter application with Firebase scaffolding retained for future development. The app currently displays Flutter's default counter screen. No inventory screens or feature implementations are connected to the app.
+Flutter inventory starter with a working storage-location preview. It includes rooms, nested containers, readable paths, and item-location selection. The preview uses sample data until Firebase is configured; create a `LocationRepository.firebase(householdId)` after sign-in to invoke the secured location Functions.
+
+## Authentication and storage locations
+
+The app initializes Firebase from `lib/firebase_options.dart`, shows a Google sign-in screen, creates a first household for a new user, and stores rooms, containers, and item locations in Firestore. Anonymous sessions are upgraded to Google credentials without losing their household data. Google sign-in is enabled in Firebase Authentication; Android builds still need their debug and release SHA-1 fingerprints registered in Firebase Project Settings before native sign-in will work.
 
 ## Run
 
@@ -26,7 +30,7 @@ Firebase dependencies and `lib/core/firebase/firebase_services.dart` are availab
 
 When ready, run `flutterfire configure` to generate real `lib/firebase_options.dart`. Initialize Firebase with those generated options before using the services. Choose the same project for Firebase CLI using `firebase use --add`.
 
-The `functions` folder contains starter `createHousehold`, `borrowItem`, and `returnItem` functions. Install dependencies with pnpm 11 and run:
+The `functions` folder contains household, borrowing, and location functions. Install dependencies with pnpm 11 and run:
 
 ```sh
 cd functions

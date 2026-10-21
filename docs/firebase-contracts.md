@@ -6,7 +6,7 @@
 - `users/{uid}/favorites/{id}`: `householdId`, `itemId`.
 - `households/{householdId}`: `name`, `ownerId`, `createdAt`.
 - `households/{householdId}/members/{uid}`: `role`, `joinedAt`.
-- `households/{householdId}/locations/{locationId}`: `room`, `container`, optional `parentId`.
+- `households/{householdId}/locations/{locationId}`: `name`, `kind` (`room` or `container`), `parentId` (null for rooms), `createdAt`, optional `updatedAt`. A container's parent is always a room.
 - `households/{householdId}/items/{itemId}`: `name`, `category`, `locationId`, `notes`, optional `photoPath`, `activeLoanId` (null when available).
 - `households/{householdId}/loans/{loanId}`: `itemId`, `borrower`, `recordedBy`, `dueDate`, `borrowedAt`, `returnedAt`.
 
@@ -23,7 +23,7 @@ All require Firebase Authentication. Default region: us-central1.
 ## Next functions to implement
 
 Student 1: create/update/delete items and coordinate photo lifecycle.
-Student 2: create/update/delete locations and move items; protect nonempty locations.
+Student 2: on the Spark plan, room/container create, rename, delete, and item moves run in Firestore transactions from the app rather than deployed Cloud Functions. Each location stores `itemCount` and `childCount`; those counters are adjusted atomically and deletion rejects a nonzero count. The callable implementations remain in source for a future Blaze deployment but are not used by the app.
 Student 3: household-scoped read queries, user favorites and scalable search if needed. For a small initial inventory, local search over loaded household items supports substring search in names and notes.
 Student 4: server-validated household invitation/join/leave flows, account screens and reminders. Handle leaving the last owner and revoking access.
 
