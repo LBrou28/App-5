@@ -46,8 +46,19 @@ service cloud.firestore {
       }
 
       match /items/{itemId} {
+        function locationExistsAfter(locationId) {
+          return locationId == null || (locationId is string
+            && existsAfter(/databases/$(database)/documents/households/$(householdId)/locations/$(locationId)));
+        }
         allow read: if member(householdId);
-        allow create, delete: if member(householdId);
+        allow create: if member(householdId)
+          && request.resource.data.keys().hasOnly(['name', 'category', 'notes', 'locationId', 'activeLoanId', 'createdAt', 'updatedAt'])
+          && validName(request.resource.data.name)
+          && request.resource.data.category is string && request.resource.data.category.size() <= 100
+          && request.resource.data.notes is string && request.resource.data.notes.size() <= 2000
+          && request.resource.data.activeLoanId == null
+          && locationExistsAfter(request.resource.data.locationId);
+        allow delete: if member(householdId) && resource.data.get('activeLoanId', null) == null;
         allow update: if member(householdId);
       }
 

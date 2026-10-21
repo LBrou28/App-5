@@ -25,11 +25,28 @@ class _LocationsPageState extends State<LocationsPage> {
     return parent == null ? location.name : '${parent.name} → ${location.name}';
   }
 
-  Future<void> _perform(Future<void> Function() action) async {
+  Future<bool> _perform(Future<void> Function() action) async {
     setState(() => _working = true);
-    try { await action(); }
-    catch (error) { if (mounted) _showMessage(error.toString().replaceFirst('Bad state: ', '').replaceFirst('Invalid argument(s): ', ''), error: true); }
+    try { await action(); return true; }
+    catch (error) { if (mounted) _showMessage(error.toString().replaceFirst('Bad state: ', '').replaceFirst('Invalid argument(s): ', ''), error: true); return false; }
     finally { if (mounted) setState(() => _working = false); }
+  }
+
+  Future<void> _addItem(List<StorageLocation> locations) async {
+    final initial = _find(locations, _selectedLocationId)?.id;
+    final item = await showDialog<_NewItem>(context: context, builder: (context) => _AddItemDialog(locations: locations, path: _path, initialLocationId: initial));
+    if (item == null) return;
+    final added = await _perform(() => widget.repository.addItem(name: item.name, category: item.category, notes: item.notes, locationId: item.locationId));
+    if (added && mounted) _showMessage('Added ${item.name}.');
+  }
+
+  Future<void> _deleteItem(StoredItem item) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Delete ${item.name}?'),
+      content: const Text('This removes the item from your household inventory.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')), FilledButton.tonal(onPressed: () => Navigator.pop(context, true), child: const Text('Delete'))],
+    ));
+    if (confirmed == true) await _perform(() => widget.repository.deleteItem(item));
   }
 
   Future<void> _nameDialog({required String title, required String label, required Future<void> Function(String) submit, String? initialValue}) async {
@@ -73,7 +90,7 @@ class _LocationsPageState extends State<LocationsPage> {
             floatingActionButton: FloatingActionButton.extended(onPressed: _working ? null : () => _nameDialog(title: 'New room', label: 'Room name', submit: widget.repository.createRoom), icon: const Icon(Icons.add), label: const Text('Add room')),
             body: SafeArea(child: LayoutBuilder(builder: (context, constraints) {
               final locationsPane = _LocationsPane(locations: locations, items: items, selectedId: _selectedLocationId, path: _path, onSelect: (id) => setState(() => _selectedLocationId = id), onAddContainer: (location) => _nameDialog(title: 'New container', label: 'Container name', submit: (name) => widget.repository.createContainer(name, location.id)), onRename: (location) => _nameDialog(title: 'Rename location', label: 'Name', initialValue: location.name, submit: (name) => widget.repository.rename(location, name)), onDelete: _delete);
-              final itemsPane = _ItemsPane(selected: selected, locations: locations, items: visibleItems, path: _path, working: _working, onMove: (item, destination) => _perform(() => widget.repository.moveItem(item, destination)));
+              final itemsPane = _ItemsPane(selected: selected, locations: locations, items: visibleItems, path: _path, working: _working, onAdd: () => _addItem(locations), onDelete: _deleteItem, onMove: (item, destination) => _perform(() => widget.repository.moveItem(item, destination)));
               if (constraints.maxWidth >= 760) return Row(children: [Expanded(child: locationsPane), const VerticalDivider(width: 1), Expanded(child: itemsPane)]);
               return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 96), children: [locationsPane, const SizedBox(height: 24), itemsPane]);
             })),
@@ -95,19 +112,76 @@ class _LocationsPane extends StatelessWidget {
 }
 
 class _ItemsPane extends StatelessWidget {
-  const _ItemsPane({required this.selected, required this.locations, required this.items, required this.path, required this.working, required this.onMove});
-  final StorageLocation? selected; final List<StorageLocation> locations; final List<StoredItem> items; final String Function(StorageLocation, List<StorageLocation>) path; final bool working; final void Function(StoredItem, String?) onMove;
+  const _ItemsPane({required this.selected, required this.locations, required this.items, required this.path, required this.working, required this.onAdd, required this.onDelete, required this.onMove});
+  final StorageLocation? selected; final List<StorageLocation> locations; final List<StoredItem> items; final String Function(StorageLocation, List<StorageLocation>) path; final bool working; final VoidCallback onAdd; final ValueChanged<StoredItem> onDelete; final void Function(StoredItem, String?) onMove;
   @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-    Text(selected == null ? 'All items' : 'Items in ${path(selected!, locations)}', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 4), Text(selected == null ? 'Move an item by choosing a new location.' : 'Only items stored here are shown.'), const SizedBox(height: 12),
-    if (items.isEmpty) const _EmptyState(icon: Icons.inventory_2_outlined, title: 'No items to show', detail: 'Items added by the inventory feature will appear here.'),
+    Row(children: [
+      Expanded(child: Text(selected == null ? 'All items' : 'Items in ${path(selected!, locations)}', style: Theme.of(context).textTheme.titleLarge)),
+      FilledButton.tonalIcon(onPressed: working ? null : onAdd, icon: const Icon(Icons.add), label: const Text('Add item')),
+    ]),
+    const SizedBox(height: 4), Text(selected == null ? 'Move an item by choosing a new location.' : 'Only items stored here are shown.'), const SizedBox(height: 12),
+    if (items.isEmpty) _EmptyState(icon: Icons.inventory_2_outlined, title: 'No items to show', detail: selected == null ? 'Tap "Add item" to record where something is stored.' : 'Tap "Add item" to store something here.'),
     ...items.map((item) {
       StorageLocation? current;
       for (final location in locations) {
         if (location.id == item.locationId) { current = location; break; }
       }
-      return Card(child: ListTile(leading: const Icon(Icons.sell_outlined), title: Text(item.name), subtitle: Text(current == null ? 'Unassigned' : 'Stored in ${path(current, locations)}'), trailing: DropdownButton<String?>(value: current?.id, underline: const SizedBox.shrink(), hint: const Text('Move'), items: [const DropdownMenuItem(value: null, child: Text('Unassigned')), ...locations.map((location) => DropdownMenuItem(value: location.id, child: Text(path(location, locations))))], onChanged: working ? null : (id) => onMove(item, id))));
+      final details = [current == null ? 'Unassigned' : 'Stored in ${path(current, locations)}', if (item.category.isNotEmpty) item.category, if (item.isOnLoan) 'On loan'].join(' · ');
+      return Card(child: ListTile(
+        leading: const Icon(Icons.sell_outlined),
+        title: Text(item.name),
+        subtitle: Text(item.notes.isEmpty ? details : '$details\n${item.notes}', maxLines: 3, overflow: TextOverflow.ellipsis),
+        isThreeLine: item.notes.isNotEmpty,
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          DropdownButton<String?>(value: current?.id, underline: const SizedBox.shrink(), hint: const Text('Move'), items: [const DropdownMenuItem(value: null, child: Text('Unassigned')), ...locations.map((location) => DropdownMenuItem(value: location.id, child: Text(path(location, locations))))], onChanged: working ? null : (id) => onMove(item, id)),
+          IconButton(tooltip: 'Delete item', icon: const Icon(Icons.delete_outline), onPressed: working ? null : () => onDelete(item)),
+        ]),
+      ));
     }),
   ]);
+}
+
+class _NewItem {
+  const _NewItem({required this.name, required this.category, required this.notes, required this.locationId});
+  final String name; final String category; final String notes; final String? locationId;
+}
+
+class _AddItemDialog extends StatefulWidget {
+  const _AddItemDialog({required this.locations, required this.path, this.initialLocationId});
+  final List<StorageLocation> locations; final String Function(StorageLocation, List<StorageLocation>) path; final String? initialLocationId;
+  @override State<_AddItemDialog> createState() => _AddItemDialogState();
+}
+
+class _AddItemDialogState extends State<_AddItemDialog> {
+  final _name = TextEditingController();
+  final _category = TextEditingController();
+  final _notes = TextEditingController();
+  late String? _locationId = widget.initialLocationId;
+
+  @override void dispose() { _name.dispose(); _category.dispose(); _notes.dispose(); super.dispose(); }
+
+  bool get _canSave => _name.text.trim().isNotEmpty;
+  void _save() { if (_canSave) Navigator.pop(context, _NewItem(name: _name.text.trim(), category: _category.text.trim(), notes: _notes.text.trim(), locationId: _locationId)); }
+
+  @override Widget build(BuildContext context) => AlertDialog(
+    title: const Text('New item'),
+    content: SizedBox(width: 400, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      TextField(controller: _name, autofocus: true, maxLength: 200, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Item name', counterText: ''), onChanged: (_) => setState(() {}), onSubmitted: (_) => _save()),
+      const SizedBox(height: 8),
+      TextField(controller: _category, maxLength: 100, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Category (optional)', hintText: 'e.g. Tools, Documents', counterText: '')),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String?>(
+        initialValue: _locationId,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Location'),
+        items: [const DropdownMenuItem<String?>(value: null, child: Text('Unassigned')), ...widget.locations.map((location) => DropdownMenuItem<String?>(value: location.id, child: Text(widget.path(location, widget.locations), overflow: TextOverflow.ellipsis)))],
+        onChanged: (id) => setState(() => _locationId = id),
+      ),
+      const SizedBox(height: 8),
+      TextField(controller: _notes, maxLength: 2000, minLines: 1, maxLines: 4, decoration: const InputDecoration(labelText: 'Notes (optional)')),
+    ]))),
+    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: _canSave ? _save : null, child: const Text('Add'))],
+  );
 }
 
 class _EmptyState extends StatelessWidget {

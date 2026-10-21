@@ -15,7 +15,7 @@ flutter pub get
 flutter run
 ```
 
-Platform projects are included for Android, iOS, and web. Android requires Android SDK; iOS requires macOS/Xcode. For this checkout only, a local SDK is available at `.tools/flutter/bin/flutter.bat` (ignored by Git).
+Platform projects are included for Android, iOS, macOS, and web. Android requires Android SDK; iOS and macOS require a Mac with Xcode. For this checkout only, a local SDK is available at `.tools/flutter/bin/flutter.bat` (ignored by Git).
 
 ## Checks
 

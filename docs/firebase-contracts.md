@@ -7,7 +7,7 @@
 - `households/{householdId}`: `name`, `ownerId`, `createdAt`.
 - `households/{householdId}/members/{uid}`: `role`, `joinedAt`.
 - `households/{householdId}/locations/{locationId}`: `name`, `kind` (`room` or `container`), `parentId` (null for rooms), `createdAt`, optional `updatedAt`. A container's parent is always a room.
-- `households/{householdId}/items/{itemId}`: `name`, `category`, `locationId`, `notes`, optional `photoPath`, `activeLoanId` (null when available).
+- `households/{householdId}/items/{itemId}`: `name`, `category` (≤100 chars, may be empty), `locationId` (null when unassigned), `notes` (≤2000 chars, may be empty), `activeLoanId` (null when available), `createdAt`, `updatedAt`, optional `photoPath`. The app creates and deletes items in Firestore transactions that also adjust the location's `itemCount`; items on loan cannot be deleted.
 - `households/{householdId}/loans/{loanId}`: `itemId`, `borrower`, `recordedBy`, `dueDate`, `borrowedAt`, `returnedAt`.
 
 Photo object path: `households/{householdId}/items/{itemId}/{fileName}`. Prefer authenticated Storage SDK reads when photos must remain private; do not distribute permanent download-token URLs.

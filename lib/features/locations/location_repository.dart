@@ -59,7 +59,7 @@ class LocationRepository {
     if (_isDemo) return Stream.value(List.unmodifiable(_items!));
     return _household.collection('items').orderBy('name').snapshots().map((snap) => snap.docs.map((doc) {
       final d = doc.data();
-      return StoredItem(id: doc.id, name: d['name'] as String? ?? 'Unnamed item', locationId: d['locationId'] as String?);
+      return StoredItem(id: doc.id, name: d['name'] as String? ?? 'Unnamed item', locationId: d['locationId'] as String?, category: d['category'] as String? ?? '', notes: d['notes'] as String? ?? '', activeLoanId: d['activeLoanId'] as String?);
     }).toList());
   }
 
@@ -109,6 +109,48 @@ class LocationRepository {
       tx.update(itemRef, {'locationId': locationId, 'updatedAt': FieldValue.serverTimestamp()});
     });
   }
+
+  /// Creates an item and, when it is placed in a location, bumps that location's itemCount in the same transaction.
+  Future<void> addItem({required String name, String category = '', String notes = '', String? locationId}) async {
+    _checkName(name);
+    _checkText(category, 100, 'Category');
+    _checkText(notes, 2000, 'Notes');
+    if (_isDemo) return;
+    final itemRef = _household.collection('items').doc();
+    await _database!.runTransaction((tx) async {
+      if (locationId != null) {
+        final destination = _household.collection('locations').doc(locationId);
+        if (!(await tx.get(destination)).exists) throw StateError('Choose an existing location.');
+        tx.update(destination, {'itemCount': FieldValue.increment(1)});
+      }
+      tx.set(itemRef, {
+        'name': name.trim(),
+        'category': category.trim(),
+        'notes': notes.trim(),
+        'locationId': locationId,
+        'activeLoanId': null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Deletes an item that is not on loan and decrements its location's itemCount.
+  Future<void> deleteItem(StoredItem item) async {
+    if (_isDemo) return;
+    final itemRef = _household.collection('items').doc(item.id);
+    await _database!.runTransaction((tx) async {
+      final data = (await tx.get(itemRef)).data();
+      if (data == null) throw StateError('Item no longer exists.');
+      if (data['activeLoanId'] != null) throw StateError('Return this item before deleting it.');
+      final locationId = data['locationId'] as String?;
+      final location = locationId == null ? null : _household.collection('locations').doc(locationId);
+      if (location != null && (await tx.get(location)).exists) tx.update(location, {'itemCount': FieldValue.increment(-1)});
+      tx.delete(itemRef);
+    });
+  }
+
+  static void _checkText(String value, int max, String label) { if (value.trim().length > max) throw ArgumentError('$label must be $max characters or fewer.'); }
 
   static void _checkName(String name) { if (name.trim().isEmpty || name.trim().length > 200 || name.contains('/')) throw ArgumentError('Enter a valid name.'); }
 }
