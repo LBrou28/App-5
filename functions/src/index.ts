@@ -25,13 +25,20 @@ function locationKind(value: unknown): 'room' | 'container' {
 export const createHousehold = onCall(async (request) => {
   const userId = uid(request.auth);
   const name = text(request.data?.name, 'name');
+  const user = db.collection('users').doc(userId);
   const household = db.collection('households').doc();
-  const batch = db.batch();
-  batch.set(household, { name, ownerId: userId, createdAt: FieldValue.serverTimestamp() });
-  batch.set(household.collection('members').doc(userId), { role: 'owner', joinedAt: FieldValue.serverTimestamp() });
-  batch.set(db.collection('users').doc(userId), { householdIds: FieldValue.arrayUnion(household.id) }, { merge: true });
-  await batch.commit();
-  return { householdId: household.id };
+  return db.runTransaction(async tx => {
+    const profile = (await tx.get(user)).data();
+    const existingId = profile?.activeHouseholdId ?? profile?.householdIds?.[0];
+    if (typeof existingId === 'string') {
+      const membership = await tx.get(db.doc(`households/${existingId}/members/${userId}`));
+      if (membership.exists) return { householdId: existingId };
+    }
+    tx.create(household, { name, ownerId: userId, createdAt: FieldValue.serverTimestamp() });
+    tx.create(household.collection('members').doc(userId), { role: 'owner', joinedAt: FieldValue.serverTimestamp() });
+    tx.set(user, { householdIds: FieldValue.arrayUnion(household.id), activeHouseholdId: household.id }, { merge: true });
+    return { householdId: household.id };
+  });
 });
 
 export const borrowItem = onCall(async (request) => {
@@ -210,3 +217,4 @@ export const deleteItem = onCall(async request => {
 });
 
 export { cleanupItemPhoto, cleanupAbandonedPhotos } from './photos';
+export { createHouseholdInvite, joinHousehold } from './households';

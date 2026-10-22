@@ -110,3 +110,26 @@ test('private photos upload, persist, reject outsiders and clean up after replac
   await functions.cleanupItemPhoto.run({params:{householdId,itemId},data:{before:{data:()=>({photoPath:secondPath})},after:{data:()=>undefined}}});
   assert.equal((await getStorage().bucket(bucket).file(secondPath).exists())[0], false);
 });
+
+test('single-use invitations join another account and cannot be forged, reused or read directly', async () => {
+  await assert.rejects(call('createHouseholdInvite', 'second', {householdId}), {code:'permission-denied'});
+  const {code} = await call('createHouseholdInvite', 'owner', {householdId});
+  assert.equal((await clientDocument('outsider', 'householdInvites/anything')).status, 403);
+  await assert.rejects(call('joinHousehold', 'new-user', {code:'fake'}), {code:'invalid-argument'});
+  assert.equal((await call('joinHousehold', 'new-user', {code})).householdId, householdId);
+  // Retrying after a lost response does not create a second membership.
+  assert.equal((await call('joinHousehold', 'new-user', {code})).householdId, householdId);
+  await assert.rejects(call('joinHousehold', 'another-user', {code}), {code:'failed-precondition'});
+  assert.equal((await db.doc(`households/${householdId}/members/new-user`).get()).data().role, 'member');
+  assert.equal((await db.doc('users/new-user').get()).data().activeHouseholdId, householdId);
+});
+
+
+test('household bootstrap is idempotent and expired invitations cannot be used', async () => {
+  const [first, second] = await Promise.all([call('createHousehold', 'fresh-user', {name:'Home'}),call('createHousehold', 'fresh-user', {name:'Home'})]);
+  assert.equal(first.householdId, second.householdId);
+  const {code} = await call('createHouseholdInvite', 'owner', {householdId});
+  const hash = require('node:crypto').createHash('sha256').update(code).digest('hex');
+  await db.doc(`householdInvites/${hash}`).update({expiresAt: require('firebase-admin/firestore').Timestamp.fromMillis(0)});
+  await assert.rejects(call('joinHousehold', 'late-user', {code}), {code:'failed-precondition'});
+});
