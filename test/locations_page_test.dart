@@ -19,6 +19,12 @@ class TestUser implements User {
 
 class PageRepository extends TestRepository {
   int deletions = 0;
+  String? movedTo = 'unchanged';
+  @override
+  Future<void> moveItem(StoredItem item, String? locationId) async {
+    movedTo = locationId;
+  }
+
   @override
   Stream<List<StorageLocation>> watchLocations() => Stream.value(const [
     StorageLocation(id: 'room', name: 'Garage', kind: LocationKind.room),
@@ -47,6 +53,17 @@ class PageRepository extends TestRepository {
     if (code != 'invitation-code') throw StateError('bad code');
     return 'joined-home';
   }
+}
+
+class NarrowRepository extends PageRepository {
+  @override
+  Stream<List<StorageLocation>> watchLocations() => Stream.value(const [
+    StorageLocation(
+      id: 'room',
+      name: 'Garage cabinet for shared household equipment',
+      kind: LocationKind.room,
+    ),
+  ]);
 }
 
 class LiveRepository extends PageRepository {
@@ -143,5 +160,28 @@ void main() {
     expect(find.text('Edit'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await repo.items.close();
+  });
+  testWidgets('inventory with long location names fits a phone screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = NarrowRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LocationsPage(repository: repo, user: TestUser()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Hammer'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('Move item'));
+    await tester.tap(find.byTooltip('Move item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unassigned'));
+    await tester.pumpAndSettle();
+    expect(repo.movedTo, isNull);
   });
 }

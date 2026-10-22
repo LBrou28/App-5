@@ -562,23 +562,24 @@ class _ItemsPane extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButton<String?>(
-                  value: current?.id,
-                  underline: const SizedBox.shrink(),
-                  hint: const Text('Move'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Unassigned'),
-                    ),
+                PopupMenuButton<String>(
+                  tooltip: 'Move item',
+                  enabled: !working,
+                  icon: const Icon(Icons.drive_file_move_outline),
+                  onSelected: (id) => onMove(item, id.isEmpty ? null : id),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: '', child: Text('Unassigned')),
                     ...locations.map(
-                      (location) => DropdownMenuItem(
+                      (location) => PopupMenuItem(
                         value: location.id,
-                        child: Text(path(location, locations)),
+                        child: Text(
+                          path(location, locations),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ],
-                  onChanged: working ? null : (id) => onMove(item, id),
                 ),
                 IconButton(
                   tooltip: 'Delete item',
