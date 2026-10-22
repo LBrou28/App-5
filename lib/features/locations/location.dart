@@ -10,12 +10,13 @@ class StorageLocation {
 enum LocationKind { room, container }
 
 class StoredItem {
-  const StoredItem({required this.id, required this.name, this.locationId, this.category = '', this.notes = '', this.activeLoanId});
+  const StoredItem({required this.id, required this.name, this.locationId, this.category = '', this.notes = '', this.activeLoanId, this.createdAt});
   final String id;
   final String name;
   final String? locationId;
   final String category;
   final String notes;
   final String? activeLoanId;
+  final DateTime? createdAt;
   bool get isOnLoan => activeLoanId != null;
 }

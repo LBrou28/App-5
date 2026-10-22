@@ -3,7 +3,7 @@
 ## Firestore layout
 
 - `users/{uid}`: `householdIds` (managed by server).
-- `users/{uid}/favorites/{id}`: `householdId`, `itemId`.
+- `users/{uid}/favorites/{householdId}_{itemId}`: `householdId`, `itemId`, `createdAt`. Private to the user; the item must exist when the favorite is written. The app removes the user's own favorite when they delete the item; other users' stale favorites are ignored because the app only shows favorites that match a loaded item.
 - `households/{householdId}`: `name`, `ownerId`, `createdAt`.
 - `households/{householdId}/members/{uid}`: `role`, `displayName`, `joinedAt`.
 - `households/{householdId}/locations/{locationId}`: `name`, `kind` (`room` or `container`), `parentId` (null for rooms), `createdAt`, optional `updatedAt`. A container's parent is always a room.
@@ -24,7 +24,7 @@ All require Firebase Authentication. Default region: us-central1.
 
 Student 1: create/update/delete items and coordinate photo lifecycle.
 Student 2: on the Spark plan, room/container create, rename, delete, and item moves run in Firestore transactions from the app rather than deployed Cloud Functions. Each location stores `itemCount` and `childCount`; those counters are adjusted atomically and deletion rejects a nonzero count. The callable implementations remain in source for a future Blaze deployment but are not used by the app.
-Student 3: household-scoped read queries, user favorites and scalable search if needed. For a small initial inventory, local search over loaded household items supports substring search in names and notes.
+Student 3: household-scoped read queries, user favorites and scalable search if needed. For a small initial inventory, local search over loaded household items supports substring search in names and notes. Implemented in the app: a Discover screen (favorites, categories, recently added, unassigned items), multi-word search over item name, category, notes and location, category and favorites filters (`lib/features/locations/item_filter.dart`), and per-user favorites.
 Student 4 is implemented: invitation/join/leave callables, account and household switching, borrowed items/history, and local Android/iOS reminders. See `docs/student-4.md` for contracts, deployment requirements and two-phone acceptance checks.
 
 ## Security and tests
