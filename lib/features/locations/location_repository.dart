@@ -11,10 +11,12 @@ class LocationRepository {
   LocationRepository.firebase(this.householdId, {FirebaseFirestore? database})
     : _database = database ?? FirebaseFirestore.instance;
 
+  LocationRepository.offline() : householdId = 'demo', _database = null;
+
   final String householdId;
-  final FirebaseFirestore _database;
+  final FirebaseFirestore? _database;
   DocumentReference<Map<String, dynamic>> get _household =>
-      _database.collection('households').doc(householdId);
+      _database!.collection('households').doc(householdId);
 
   static Future<LocationRepository> forUser(
     String uid, {
@@ -151,7 +153,7 @@ class LocationRepository {
         throw ArgumentError('Choose a photo smaller than 5 MB.');
       }
       uploadedPath =
-          'households/$householdId/items/$itemId/${_database.collection('_ids').doc().id}';
+          'households/$householdId/items/$itemId/${_database!.collection('_ids').doc().id}';
       await FirebaseStorage.instance
           .ref(uploadedPath)
           .putData(

@@ -46,3 +46,7 @@ Sign in on phone A and choose **Invite a member** from the account menu. On phon
 Add an item with a photo on A, open it on B, edit its notes/category/location, then delete it with confirmation. Both phones observe the same live Firestore inventory. Borrowed items cannot be deleted until returned. Loan functions are present; a borrowing UI, search/favorites screens, and reminders remain other feature work.
 
 See [Firebase contracts](docs/firebase-contracts.md) for the shared schema and callable API. Platform projects are included for Android, iOS, macOS and web; this build workflow validates Android. iOS/macOS builds require a Mac and their platform sign-in setup.
+
+## Local demo preview
+
+Run `flutter run -d chrome --dart-define=DEMO_MODE=true` to explore the real inventory screens with sample data and no Firebase connection. Demo changes and photos stay in memory and reset on refresh. Normal builds still require sign-in.

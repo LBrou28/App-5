@@ -11,11 +11,11 @@ class LocationsPage extends StatefulWidget {
   const LocationsPage({
     super.key,
     required this.repository,
-    required this.user,
+    this.user,
     this.onHouseholdChanged,
   });
   final LocationRepository repository;
-  final User user;
+  final User? user;
   final ValueChanged<String>? onHouseholdChanged;
   @override
   State<LocationsPage> createState() => _LocationsPageState();
@@ -286,42 +286,52 @@ class _LocationsPageState extends State<LocationsPage> {
               : items.where((item) => item.locationId == selected.id).toList();
           return Scaffold(
             appBar: AppBar(
+              bottom: widget.user == null
+                  ? const PreferredSize(
+                      preferredSize: Size.fromHeight(28),
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Text('Demo · changes reset when you refresh'),
+                      ),
+                    )
+                  : null,
               title: StreamBuilder<String>(
                 stream: widget.repository.watchHouseholdName(),
                 builder: (context, snapshot) =>
                     Text(snapshot.data ?? 'My household'),
               ),
               actions: [
-                PopupMenuButton<String>(
-                  tooltip: 'Account and household',
-                  enabled: !_working,
-                  onSelected: (value) {
-                    if (value == 'signOut') FirebaseAuth.instance.signOut();
-                    if (value == 'invite') _invite();
-                    if (value == 'join') _join();
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'account',
-                      enabled: false,
-                      child: Text(widget.user.email ?? 'Signed in'),
-                    ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem(
-                      value: 'invite',
-                      child: Text('Invite a member'),
-                    ),
-                    if (widget.onHouseholdChanged != null)
-                      const PopupMenuItem(
-                        value: 'join',
-                        child: Text('Join a household'),
+                if (widget.user != null)
+                  PopupMenuButton<String>(
+                    tooltip: 'Account and household',
+                    enabled: !_working,
+                    onSelected: (value) {
+                      if (value == 'signOut') FirebaseAuth.instance.signOut();
+                      if (value == 'invite') _invite();
+                      if (value == 'join') _join();
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'account',
+                        enabled: false,
+                        child: Text(widget.user?.email ?? 'Signed in'),
                       ),
-                    const PopupMenuItem(
-                      value: 'signOut',
-                      child: Text('Sign out'),
-                    ),
-                  ],
-                ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'invite',
+                        child: Text('Invite a member'),
+                      ),
+                      if (widget.onHouseholdChanged != null)
+                        const PopupMenuItem(
+                          value: 'join',
+                          child: Text('Join a household'),
+                        ),
+                      const PopupMenuItem(
+                        value: 'signOut',
+                        child: Text('Sign out'),
+                      ),
+                    ],
+                  ),
               ],
             ),
             floatingActionButton: FloatingActionButton.extended(

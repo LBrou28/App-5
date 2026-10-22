@@ -6,10 +6,15 @@ import 'firebase_options.dart';
 import 'features/locations/location_repository.dart';
 import 'features/locations/locations_page.dart';
 import 'features/auth/sign_in_page.dart';
+import 'features/locations/demo_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (!const bool.fromEnvironment('DEMO_MODE')) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   runApp(const App5());
 }
 
@@ -22,7 +27,9 @@ class App5 extends StatelessWidget {
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b87)),
       useMaterial3: true,
     ),
-    home: const _AuthGate(),
+    home: const bool.fromEnvironment('DEMO_MODE')
+        ? LocationsPage(repository: DemoLocationRepository())
+        : const _AuthGate(),
   );
 }
 
