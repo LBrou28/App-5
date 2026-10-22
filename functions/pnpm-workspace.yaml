@@ -1,3 +1,6 @@
 allowBuilds:
   '@firebase/util': true
   protobufjs: true
+  re2: true
+minimumReleaseAgeExclude:
+  - firebase-tools@15.34.1

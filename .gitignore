@@ -19,3 +19,5 @@ functions/lib/
 firebase-debug.log*
 *service-account*.json
 trello-*.jpg
+
+.pnpm-store/
