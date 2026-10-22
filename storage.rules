@@ -6,8 +6,12 @@ service firebase.storage {
         return request.auth != null && firestore.exists(/databases/(default)/documents/households/$(householdId)/members/$(request.auth.uid));
       }
       allow read: if member();
-      allow create, update: if member() && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
-      allow delete: if member();
+      // Each save uses an immutable object. Server triggers remove replaced/deleted photos.
+      allow create: if resource == null && member() && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && fileName.matches('[A-Za-z0-9_-]+');
+      allow update, delete: if false;
     }
   }
 }
+
