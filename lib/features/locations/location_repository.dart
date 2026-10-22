@@ -1,156 +1,174 @@
-import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import 'location.dart';
 
-/// Spark-plan implementation: Firestore transactions keep location counters valid.
+/// Household reads are live; shared mutations are validated on the server.
 class LocationRepository {
-  LocationRepository.demo()
-      : _locations = [
-          const StorageLocation(id: 'bedroom', name: 'Bedroom', kind: LocationKind.room),
-          const StorageLocation(id: 'garage', name: 'Garage', kind: LocationKind.room),
-          const StorageLocation(id: 'drawer', name: 'Top drawer', kind: LocationKind.container, parentId: 'bedroom'),
-        ],
-        _items = [const StoredItem(id: 'keys', name: 'Spare keys', locationId: 'drawer'), const StoredItem(id: 'hammer', name: 'Hammer', locationId: 'garage')],
-        householdId = null,
-        _database = null;
   LocationRepository.firebase(this.householdId, {FirebaseFirestore? database})
-      : _database = database ?? FirebaseFirestore.instance,
-        _locations = null,
-        _items = null;
+    : _database = database ?? FirebaseFirestore.instance;
 
-  final String? householdId;
-  final FirebaseFirestore? _database;
-  final List<StorageLocation>? _locations;
-  final List<StoredItem>? _items;
-  bool get _isDemo => _locations != null;
-  DocumentReference<Map<String, dynamic>> get _household => _database!.collection('households').doc(householdId);
+  final String householdId;
+  final FirebaseFirestore _database;
+  DocumentReference<Map<String, dynamic>> get _household =>
+      _database.collection('households').doc(householdId);
 
-  static Future<LocationRepository> forUser(String uid, {FirebaseFirestore? database}) async {
+  static Future<LocationRepository> forUser(
+    String uid, {
+    FirebaseFirestore? database,
+  }) async {
     final db = database ?? FirebaseFirestore.instance;
-    final user = db.collection('users').doc(uid);
-    final data = (await user.get()).data();
+    final data = (await db.collection('users').doc(uid).get()).data();
     final ids = List<String>.from(data?['householdIds'] ?? const []);
-    if (ids.isNotEmpty) return LocationRepository.firebase(ids.first, database: db);
-    final household = db.collection('households').doc();
-    final batch = db.batch();
-    batch.set(household, {'name': 'My household', 'ownerId': uid, 'createdAt': FieldValue.serverTimestamp()});
-    batch.set(household.collection('members').doc(uid), {'role': 'owner', 'joinedAt': FieldValue.serverTimestamp()});
-    batch.set(user, {'householdIds': [household.id]}, SetOptions(merge: true));
-    await batch.commit();
-    return LocationRepository.firebase(household.id, database: db);
+    if (ids.isNotEmpty) {
+      return LocationRepository.firebase(
+        data?['activeHouseholdId'] as String? ?? ids.first,
+        database: db,
+      );
+    }
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('createHousehold')
+        .call({'name': 'My household'});
+    return LocationRepository.firebase(
+      result.data['householdId'] as String,
+      database: db,
+    );
   }
 
-  Stream<List<StorageLocation>> watchLocations() {
-    if (_isDemo) return Stream.value(List.unmodifiable(_locations!));
-    return _household.collection('locations').orderBy('name').snapshots().map((snap) => snap.docs.map((doc) {
-      final d = doc.data();
-      return StorageLocation(id: doc.id, name: d['name'] as String? ?? 'Unnamed location', kind: d['kind'] == 'container' ? LocationKind.container : LocationKind.room, parentId: d['parentId'] as String?);
-    }).toList());
+  Future<void> _call(String name, Map<String, dynamic> data) async {
+    await FirebaseFunctions.instance.httpsCallable(name).call({
+      'householdId': householdId,
+      ...data,
+    });
   }
 
-  Stream<String> watchHouseholdName() {
-    if (_isDemo) return Stream.value('My household');
-    return _household.snapshots().map((snapshot) => snapshot.data()?['name'] as String? ?? 'My household');
+  Stream<List<StorageLocation>> watchLocations() => _household
+      .collection('locations')
+      .orderBy('name')
+      .snapshots()
+      .map(
+        (snap) => snap.docs.map((doc) {
+          final d = doc.data();
+          return StorageLocation(
+            id: doc.id,
+            name: d['name'] as String? ?? 'Unnamed location',
+            kind: d['kind'] == 'container'
+                ? LocationKind.container
+                : LocationKind.room,
+            parentId: d['parentId'] as String?,
+          );
+        }).toList(),
+      );
+
+  Stream<String> watchHouseholdName() => _household.snapshots().map(
+    (s) => s.data()?['name'] as String? ?? 'My household',
+  );
+
+  Stream<List<StoredItem>> watchItems() => _household
+      .collection('items')
+      .orderBy('name')
+      .snapshots()
+      .map(
+        (snap) => snap.docs.map((doc) {
+          final d = doc.data();
+          return StoredItem(
+            id: doc.id,
+            name: d['name'] as String? ?? 'Unnamed item',
+            locationId: d['locationId'] as String?,
+            category: d['category'] as String? ?? '',
+            notes: d['notes'] as String? ?? '',
+            activeLoanId: d['activeLoanId'] as String?,
+            photoPath: d['photoPath'] as String?,
+            revision: d['revision'] as int? ?? 0,
+          );
+        }).toList(),
+      );
+
+  Future<String> createInvitation() async {
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('createHouseholdInvite')
+        .call({'householdId': householdId});
+    return result.data['code'] as String;
   }
 
-  Stream<List<StoredItem>> watchItems() {
-    if (_isDemo) return Stream.value(List.unmodifiable(_items!));
-    return _household.collection('items').orderBy('name').snapshots().map((snap) => snap.docs.map((doc) {
-      final d = doc.data();
-      return StoredItem(id: doc.id, name: d['name'] as String? ?? 'Unnamed item', locationId: d['locationId'] as String?, category: d['category'] as String? ?? '', notes: d['notes'] as String? ?? '', activeLoanId: d['activeLoanId'] as String?);
-    }).toList());
+  Future<String> joinHousehold(String code) async {
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('joinHousehold')
+        .call({'code': code.trim()});
+    return result.data['householdId'] as String;
   }
 
-  Future<void> createRoom(String name) => _create(name, LocationKind.room);
-  Future<void> createContainer(String name, String roomId) => _create(name, LocationKind.container, parentId: roomId);
-  Future<void> _create(String name, LocationKind kind, {String? parentId}) async {
-    _checkName(name); if (_isDemo) return;
-    final location = _household.collection('locations').doc();
-    await _database!.runTransaction((tx) async {
-      if (kind == LocationKind.container) {
-        final parent = _household.collection('locations').doc(parentId);
-        final data = (await tx.get(parent)).data();
-        if (data == null || data['kind'] != 'room') throw StateError('Choose an existing room.');
-        tx.update(parent, {'childCount': FieldValue.increment(1)});
+  Future<void> createRoom(String name) =>
+      _call('createLocation', {'name': name, 'kind': 'room'});
+  Future<void> createContainer(String name, String roomId) => _call(
+    'createLocation',
+    {'name': name, 'kind': 'container', 'parentId': roomId},
+  );
+  Future<void> rename(StorageLocation location, String name) =>
+      _call('renameLocation', {'locationId': location.id, 'name': name});
+  Future<void> delete(StorageLocation location) =>
+      _call('deleteLocation', {'locationId': location.id});
+  Future<void> moveItem(StoredItem item, String? locationId) =>
+      _call('moveItem', {'itemId': item.id, 'locationId': locationId});
+  Future<void> deleteItem(StoredItem item) =>
+      _call('deleteItem', {'itemId': item.id});
+
+  Future<Uint8List?> loadPhoto(String path) =>
+      FirebaseStorage.instance.ref(path).getData(5 * 1024 * 1024);
+
+  Future<void> addItem({
+    required String name,
+    String category = '',
+    String notes = '',
+    String? locationId,
+  }) => saveItem(
+    name: name,
+    category: category,
+    notes: notes,
+    locationId: locationId,
+  );
+
+  String newItemId() => _household.collection('items').doc().id;
+
+  Future<void> saveItem({
+    String? draftId,
+    StoredItem? existing,
+    required String name,
+    required String category,
+    required String notes,
+    String? locationId,
+    Uint8List? photo,
+    String? photoType,
+    bool removePhoto = false,
+  }) async {
+    final itemId = existing?.id ?? draftId ?? newItemId();
+    String? uploadedPath;
+    if (photo != null) {
+      if (photo.length >= 5 * 1024 * 1024) {
+        throw ArgumentError('Choose a photo smaller than 5 MB.');
       }
-      tx.set(location, {'name': name.trim(), 'kind': kind.name, 'parentId': parentId, 'itemCount': 0, 'childCount': 0, 'createdAt': FieldValue.serverTimestamp()});
+      uploadedPath =
+          'households/$householdId/items/$itemId/${_database.collection('_ids').doc().id}';
+      await FirebaseStorage.instance
+          .ref(uploadedPath)
+          .putData(
+            photo,
+            SettableMetadata(contentType: photoType ?? 'image/jpeg'),
+          );
+    }
+    // Keep uploads after an ambiguous network response: the write may have
+    // committed. A daily server job removes unreferenced uploads after 24 hours.
+    await _call(existing == null ? 'createItem' : 'updateItem', {
+      'revision': existing?.revision ?? 0,
+      'itemId': itemId,
+      'name': name,
+      'category': category,
+      'notes': notes,
+      'locationId': locationId,
+      'photoPath': uploadedPath ?? (removePhoto ? null : existing?.photoPath),
     });
   }
-
-  Future<void> rename(StorageLocation location, String name) async { _checkName(name); if (!_isDemo) await _household.collection('locations').doc(location.id).update({'name': name.trim()}); }
-
-  Future<void> delete(StorageLocation location) async {
-    if (_isDemo) return;
-    final ref = _household.collection('locations').doc(location.id);
-    await _database!.runTransaction((tx) async {
-      final data = (await tx.get(ref)).data();
-      if (data == null) throw StateError('Location no longer exists.');
-      if ((data['itemCount'] as int? ?? 0) != 0 || (data['childCount'] as int? ?? 0) != 0) throw StateError('Move all items and containers before deleting this location.');
-      final parentId = data['parentId'] as String?;
-      if (parentId != null) tx.update(_household.collection('locations').doc(parentId), {'childCount': FieldValue.increment(-1)});
-      tx.delete(ref);
-    });
-  }
-
-  Future<void> moveItem(StoredItem item, String? locationId) async {
-    if (_isDemo) return;
-    final itemRef = _household.collection('items').doc(item.id);
-    await _database!.runTransaction((tx) async {
-      final itemData = (await tx.get(itemRef)).data();
-      if (itemData == null) throw StateError('Item no longer exists.');
-      final destination = locationId == null ? null : _household.collection('locations').doc(locationId);
-      if (destination != null && !(await tx.get(destination)).exists) throw StateError('Destination location no longer exists.');
-      final oldId = itemData['locationId'] as String?;
-      if (oldId == locationId) return;
-      if (oldId != null) tx.update(_household.collection('locations').doc(oldId), {'itemCount': FieldValue.increment(-1)});
-      if (destination != null) tx.update(destination, {'itemCount': FieldValue.increment(1)});
-      tx.update(itemRef, {'locationId': locationId, 'updatedAt': FieldValue.serverTimestamp()});
-    });
-  }
-
-  /// Creates an item and, when it is placed in a location, bumps that location's itemCount in the same transaction.
-  Future<void> addItem({required String name, String category = '', String notes = '', String? locationId}) async {
-    _checkName(name);
-    _checkText(category, 100, 'Category');
-    _checkText(notes, 2000, 'Notes');
-    if (_isDemo) return;
-    final itemRef = _household.collection('items').doc();
-    await _database!.runTransaction((tx) async {
-      if (locationId != null) {
-        final destination = _household.collection('locations').doc(locationId);
-        if (!(await tx.get(destination)).exists) throw StateError('Choose an existing location.');
-        tx.update(destination, {'itemCount': FieldValue.increment(1)});
-      }
-      tx.set(itemRef, {
-        'name': name.trim(),
-        'category': category.trim(),
-        'notes': notes.trim(),
-        'locationId': locationId,
-        'activeLoanId': null,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    });
-  }
-
-  /// Deletes an item that is not on loan and decrements its location's itemCount.
-  Future<void> deleteItem(StoredItem item) async {
-    if (_isDemo) return;
-    final itemRef = _household.collection('items').doc(item.id);
-    await _database!.runTransaction((tx) async {
-      final data = (await tx.get(itemRef)).data();
-      if (data == null) throw StateError('Item no longer exists.');
-      if (data['activeLoanId'] != null) throw StateError('Return this item before deleting it.');
-      final locationId = data['locationId'] as String?;
-      final location = locationId == null ? null : _household.collection('locations').doc(locationId);
-      if (location != null && (await tx.get(location)).exists) tx.update(location, {'itemCount': FieldValue.increment(-1)});
-      tx.delete(itemRef);
-    });
-  }
-
-  static void _checkText(String value, int max, String label) { if (value.trim().length > max) throw ArgumentError('$label must be $max characters or fewer.'); }
-
-  static void _checkName(String name) { if (name.trim().isEmpty || name.trim().length > 200 || name.contains('/')) throw ArgumentError('Enter a valid name.'); }
 }
