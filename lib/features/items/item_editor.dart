@@ -317,6 +317,9 @@ class _ItemPhotoState extends State<ItemPhoto> {
     future: _bytes,
     builder: (context, snapshot) {
       if (snapshot.hasError) return const Text('Photo unavailable.');
+      if (snapshot.connectionState == ConnectionState.done && !snapshot.hasData) {
+        return const Text('Photo unavailable.');
+      }
       if (!snapshot.hasData) {
         return SizedBox(
           height: widget.height,
