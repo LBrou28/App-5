@@ -11,7 +11,8 @@ service cloud.firestore {
     function validName(value) { return value is string && value.size() > 0 && value.size() <= 200 && !value.matches('.*/.*'); }
 
     match /users/{userId} {
-      allow read, create, update: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if false;
       allow delete: if false;
       match /favorites/{favoriteId} {
         allow read, delete: if signedIn() && request.auth.uid == userId;
@@ -21,15 +22,13 @@ service cloud.firestore {
     }
 
     match /households/{householdId} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid && validName(request.resource.data.name);
+      allow create: if false;
       allow read: if member(householdId);
       allow update, delete: if false;
 
       match /members/{userId} {
         allow read: if member(householdId);
-        allow create: if signedIn() && request.resource.data.role in ['owner', 'member']
-          && ((userId == request.auth.uid && getAfter(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid) || owner(householdId));
-        allow update, delete: if owner(householdId);
+        allow create, update, delete: if false;
       }
 
       match /locations/{locationId} {
@@ -59,10 +58,11 @@ service cloud.firestore {
           && request.resource.data.activeLoanId == null
           && locationExistsAfter(request.resource.data.locationId);
         allow delete: if member(householdId) && resource.data.get('activeLoanId', null) == null;
-        allow update: if member(householdId);
+        allow update: if member(householdId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeLoanId']);
       }
 
-      match /loans/{loanId} { allow read, write: if member(householdId); }
+      match /loans/{loanId} { allow read: if member(householdId); allow write: if false; }
     }
   }
 }
+

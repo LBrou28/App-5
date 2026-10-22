@@ -35,7 +35,7 @@ export const createHousehold = onCall(async (request) => {
   const household = db.collection('households').doc();
   const batch = db.batch();
   batch.set(household, { name, ownerId: userId, createdAt: FieldValue.serverTimestamp() });
-  batch.set(household.collection('members').doc(userId), { role: 'owner', joinedAt: FieldValue.serverTimestamp() });
+  batch.set(household.collection('members').doc(userId), { role: 'owner', displayName: request.auth?.token.name ?? request.auth?.token.email ?? 'Household owner', joinedAt: FieldValue.serverTimestamp() });
   batch.set(db.collection('users').doc(userId), { householdIds: FieldValue.arrayUnion(household.id) }, { merge: true });
   await batch.commit();
   return { householdId: household.id };
@@ -82,7 +82,10 @@ export const returnItem = onCall(async (request) => {
     if (!snapshot.exists) throw new HttpsError('not-found', 'Item not found.');
     const activeLoanId = snapshot.data()?.activeLoanId;
     if (typeof activeLoanId !== 'string' || !activeLoanId) throw new HttpsError('failed-precondition', 'Item has no active loan.');
-    transaction.update(household.collection('loans').doc(activeLoanId), { returnedAt: FieldValue.serverTimestamp() });
+    const loan = household.collection('loans').doc(activeLoanId);
+    const history = await transaction.get(loan);
+    if (!history.exists || history.data()?.itemId !== itemId || history.data()?.returnedAt != null) throw new HttpsError('failed-precondition', 'Loan record does not match this item.');
+    transaction.update(loan, { returnedAt: FieldValue.serverTimestamp() });
     transaction.update(item, { activeLoanId: null });
   });
   return { returned: true };
@@ -139,3 +142,6 @@ export const moveItem = onCall(async (request) => {
     transaction.update(item, { locationId: locationId ?? null, updatedAt: FieldValue.serverTimestamp() });
   }); return { moved: true };
 });
+
+export { createInvitation, joinHousehold, leaveHousehold } from './sharing';
+
