@@ -5,64 +5,36 @@ service cloud.firestore {
     function member(householdId) {
       return signedIn() && exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
     }
-    function owner(householdId) {
-      return member(householdId) && get(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid)).data.role == 'owner';
-    }
-    function validName(value) { return value is string && value.size() > 0 && value.size() <= 200 && !value.matches('.*/.*'); }
-
     match /users/{userId} {
-      allow read, create, update: if signedIn() && request.auth.uid == userId;
-      allow delete: if false;
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow write: if false;
       match /favorites/{favoriteId} {
         allow read, delete: if signedIn() && request.auth.uid == userId;
         allow create, update: if signedIn() && request.auth.uid == userId
-          && member(request.resource.data.householdId);
+          && request.resource.data.keys().hasOnly(['householdId', 'itemId'])
+          && member(request.resource.data.householdId)
+          && exists(/databases/$(database)/documents/households/$(request.resource.data.householdId)/items/$(request.resource.data.itemId));
       }
     }
-
     match /households/{householdId} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid && validName(request.resource.data.name);
       allow read: if member(householdId);
-      allow update, delete: if false;
-
+      allow write: if false;
       match /members/{userId} {
         allow read: if member(householdId);
-        allow create: if signedIn() && request.resource.data.role in ['owner', 'member']
-          && ((userId == request.auth.uid && getAfter(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid) || owner(householdId));
-        allow update, delete: if owner(householdId);
+        allow write: if false;
       }
-
       match /locations/{locationId} {
         allow read: if member(householdId);
-        allow create: if member(householdId) && validName(request.resource.data.name)
-          && request.resource.data.kind in ['room', 'container']
-          && request.resource.data.itemCount == 0 && request.resource.data.childCount == 0
-          && ((request.resource.data.kind == 'room' && request.resource.data.parentId == null)
-            || (request.resource.data.kind == 'container' && request.resource.data.parentId is string
-              && get(/databases/$(database)/documents/households/$(householdId)/locations/$(request.resource.data.parentId)).data.kind == 'room'));
-        allow update: if member(householdId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'itemCount', 'childCount', 'updatedAt'])
-          && (request.resource.data.name == resource.data.name || validName(request.resource.data.name));
-        allow delete: if member(householdId) && resource.data.itemCount == 0 && resource.data.childCount == 0;
+        allow write: if false;
       }
-
       match /items/{itemId} {
-        function locationExistsAfter(locationId) {
-          return locationId == null || (locationId is string
-            && existsAfter(/databases/$(database)/documents/households/$(householdId)/locations/$(locationId)));
-        }
         allow read: if member(householdId);
-        allow create: if member(householdId)
-          && request.resource.data.keys().hasOnly(['name', 'category', 'notes', 'locationId', 'activeLoanId', 'createdAt', 'updatedAt'])
-          && validName(request.resource.data.name)
-          && request.resource.data.category is string && request.resource.data.category.size() <= 100
-          && request.resource.data.notes is string && request.resource.data.notes.size() <= 2000
-          && request.resource.data.activeLoanId == null
-          && locationExistsAfter(request.resource.data.locationId);
-        allow delete: if member(householdId) && resource.data.get('activeLoanId', null) == null;
-        allow update: if member(householdId);
+        allow write: if false;
       }
-
-      match /loans/{loanId} { allow read, write: if member(householdId); }
+      match /loans/{loanId} {
+        allow read: if member(householdId);
+        allow write: if false;
+      }
     }
   }
 }
