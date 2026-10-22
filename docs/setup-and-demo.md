@@ -33,7 +33,7 @@ For a stable certificate across workflow runs:
 3. Register that keystore's SHA-1 and SHA-256 in Firebase. The workflow's **Show demo signing fingerprint** step prints only public certificate information.
 4. Download the `app-5-debug-apk` artifact from a successful Actions run, extract it and install the APK on both phones.
 
-Without the secret, the APK still builds with the runner's generated debug key. That certificate varies between runners, so native Google sign-in needs its fingerprint registered for each resulting key. Pull requests from forks do not receive repository secrets.
+Without the secret, the workflow creates and explicitly selects a temporary debug key. That certificate varies between runners, so native Google sign-in needs its fingerprint registered for each resulting key. Pull requests from forks do not receive repository secrets.
 
 ## Two-phone acceptance check
 

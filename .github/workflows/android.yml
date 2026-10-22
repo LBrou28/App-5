@@ -30,18 +30,24 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: flutter analyze
       - run: flutter test
-      - name: Restore optional stable debug signing key
+      - name: Prepare demo signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
+          mkdir -p "$RUNNER_TEMP/app5-signing"
+          keystore="$RUNNER_TEMP/app5-signing/debug.keystore"
           if [ -n "$KEYSTORE_BASE64" ]; then
-            mkdir -p "$HOME/.android"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          else
+            keytool -genkeypair -noprompt -keystore "$keystore" -alias androiddebugkey \
+              -storepass android -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
+          echo "ANDROID_DEBUG_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
       - name: Build installable demo APK
         run: flutter build apk --debug
       - name: Show demo signing fingerprint
-        run: keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android
+        run: keytool -list -v -keystore "$ANDROID_DEBUG_KEYSTORE_PATH" -alias androiddebugkey -storepass android -keypass android
       - uses: actions/upload-artifact@v4
         with:
           name: app-5-debug-apk
