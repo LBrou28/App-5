@@ -17,10 +17,13 @@ class App5 extends StatelessWidget {
   const App5({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Where Did I Put It?',
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b87)), useMaterial3: true),
-        home: const _AuthGate(),
-      );
+    title: 'Where Did I Put It?',
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b87)),
+      useMaterial3: true,
+    ),
+    home: const _AuthGate(),
+  );
 }
 
 class _AuthGate extends StatelessWidget {
@@ -29,7 +32,9 @@ class _AuthGate extends StatelessWidget {
   Widget build(BuildContext context) => StreamBuilder<User?>(
     stream: FirebaseAuth.instance.authStateChanges(),
     builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
       final user = snapshot.data;
       return user == null || user.isAnonymous
           ? SignInPage(anonymousUser: user?.isAnonymous == true ? user : null)
@@ -37,5 +42,3 @@ class _AuthGate extends StatelessWidget {
     },
   );
 }
-
-
