@@ -2,12 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'location.dart';
+import '../sharing/household_home.dart';
 import 'location_repository.dart';
 
 class LocationsPage extends StatefulWidget {
-  const LocationsPage({super.key, required this.repository, required this.user});
+  const LocationsPage({super.key, required this.repository, required this.user, required this.onHouseholdChanged});
   final LocationRepository repository;
   final User user;
+  final ValueChanged<String> onHouseholdChanged;
   @override State<LocationsPage> createState() => _LocationsPageState();
 }
 
@@ -85,7 +87,7 @@ class _LocationsPageState extends State<LocationsPage> {
           return Scaffold(
             appBar: AppBar(
               title: StreamBuilder<String>(stream: widget.repository.watchHouseholdName(), builder: (context, snapshot) => Text(snapshot.data ?? 'My household')),
-              actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'signOut') FirebaseAuth.instance.signOut(); }, itemBuilder: (context) => [PopupMenuItem(value: 'account', enabled: false, child: Text(widget.user.email ?? 'Signed in')), const PopupMenuDivider(), const PopupMenuItem(value: 'signOut', child: Text('Sign out'))])],
+              actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'signOut') FirebaseAuth.instance.signOut(); if (value == 'household') Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AccountPage(householdId: widget.repository.householdId!, user: widget.user, onSelected: widget.onHouseholdChanged))); }, itemBuilder: (context) => [PopupMenuItem(value: 'account', enabled: false, child: Text(widget.user.email ?? 'Signed in')), const PopupMenuDivider(), const PopupMenuItem(value: 'household', child: Text('Account & household')), const PopupMenuItem(value: 'signOut', child: Text('Sign out'))])],
             ),
             floatingActionButton: FloatingActionButton.extended(onPressed: _working ? null : () => _nameDialog(title: 'New room', label: 'Room name', submit: widget.repository.createRoom), icon: const Icon(Icons.add), label: const Text('Add room')),
             body: SafeArea(child: LayoutBuilder(builder: (context, constraints) {
@@ -194,3 +196,4 @@ class _Failure extends StatelessWidget {
   const _Failure({required this.message}); final String message;
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(message, textAlign: TextAlign.center))));
 }
+

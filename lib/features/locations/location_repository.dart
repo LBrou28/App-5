@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'location.dart';
+import '../sharing/sharing_repository.dart';
 
 /// Spark-plan implementation: Firestore transactions keep location counters valid.
 class LocationRepository {
@@ -33,13 +34,8 @@ class LocationRepository {
     final data = (await user.get()).data();
     final ids = List<String>.from(data?['householdIds'] ?? const []);
     if (ids.isNotEmpty) return LocationRepository.firebase(ids.first, database: db);
-    final household = db.collection('households').doc();
-    final batch = db.batch();
-    batch.set(household, {'name': 'My household', 'ownerId': uid, 'createdAt': FieldValue.serverTimestamp()});
-    batch.set(household.collection('members').doc(uid), {'role': 'owner', 'joinedAt': FieldValue.serverTimestamp()});
-    batch.set(user, {'householdIds': [household.id]}, SetOptions(merge: true));
-    await batch.commit();
-    return LocationRepository.firebase(household.id, database: db);
+    final householdId = await SharingRepository.create('My household');
+    return LocationRepository.firebase(householdId, database: db);
   }
 
   Stream<List<StorageLocation>> watchLocations() {
@@ -154,3 +150,4 @@ class LocationRepository {
 
   static void _checkName(String name) { if (name.trim().isEmpty || name.trim().length > 200 || name.contains('/')) throw ArgumentError('Enter a valid name.'); }
 }
+
