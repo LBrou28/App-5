@@ -5,7 +5,7 @@
 - `users/{uid}`: `householdIds` (managed by server).
 - `users/{uid}/favorites/{id}`: `householdId`, `itemId`.
 - `households/{householdId}`: `name`, `ownerId`, `createdAt`.
-- `households/{householdId}/members/{uid}`: `role`, `joinedAt`.
+- `households/{householdId}/members/{uid}`: `role`, `displayName`, `joinedAt`.
 - `households/{householdId}/locations/{locationId}`: `name`, `kind` (`room` or `container`), `parentId` (null for rooms), `createdAt`, optional `updatedAt`. A container's parent is always a room.
 - `households/{householdId}/items/{itemId}`: `name`, `category` (≤100 chars, may be empty), `locationId` (null when unassigned), `notes` (≤2000 chars, may be empty), `activeLoanId` (null when available), `createdAt`, `updatedAt`, optional `photoPath`. The app creates and deletes items in Firestore transactions that also adjust the location's `itemCount`; items on loan cannot be deleted.
 - `households/{householdId}/loans/{loanId}`: `itemId`, `borrower`, `recordedBy`, `dueDate`, `borrowedAt`, `returnedAt`.
@@ -25,8 +25,10 @@ All require Firebase Authentication. Default region: us-central1.
 Student 1: create/update/delete items and coordinate photo lifecycle.
 Student 2: on the Spark plan, room/container create, rename, delete, and item moves run in Firestore transactions from the app rather than deployed Cloud Functions. Each location stores `itemCount` and `childCount`; those counters are adjusted atomically and deletion rejects a nonzero count. The callable implementations remain in source for a future Blaze deployment but are not used by the app.
 Student 3: household-scoped read queries, user favorites and scalable search if needed. For a small initial inventory, local search over loaded household items supports substring search in names and notes.
-Student 4: server-validated household invitation/join/leave flows, account screens and reminders. Handle leaving the last owner and revoking access.
+Student 4 is implemented: invitation/join/leave callables, account and household switching, borrowed items/history, and local Android/iOS reminders. See `docs/student-4.md` for contracts, deployment requirements and two-phone acceptance checks.
 
 ## Security and tests
 
-Client Security Rules deny shared writes and allow reads only to members. Favorites are private to the user; writes validate household membership and item existence. Storage rules allow member image uploads under 5 MB. Add emulator integration tests covering outsider denial, malformed writes, concurrent loans, stale membership and returns before live deployment. Current server tests verify input guards only; they do not replace emulator tests.
+Client Security Rules require household membership for reads and inventory/location writes. Memberships, user household indexes, loans and changes to item activeLoanId are server-only. Favorites are private to the user and require membership. Storage rules allow member image uploads under 5 MB. Add emulator integration tests covering outsider denial, malformed writes, concurrent loans, stale membership and returns before live deployment. The optional sharing emulator suite covers membership, forged loan writes, concurrent borrowing, returns and access after leaving. Physical-device sign-in and notification delivery still require manual checks.
+
+
