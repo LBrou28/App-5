@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../core/theme/app_theme.dart';
+
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key, this.anonymousUser});
   final User? anonymousUser;
@@ -47,19 +49,53 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  @override Widget build(BuildContext context) => Scaffold(
-    body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Icon(Icons.inventory_2_outlined, size: 56, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 16),
-        Text('Where Did I Put It?', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        const Text('Sign in to securely access your household inventory.', textAlign: TextAlign.center),
-        const SizedBox(height: 24),
-        FilledButton.icon(onPressed: _busy ? null : _signInWithGoogle, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.login), label: const Text('Continue with Google')),
-        if (_error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-      ]),
-    ))),
-  );
+  @override Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primaryContainer.withValues(alpha: 0.6), scheme.surface, scheme.tertiaryContainer.withValues(alpha: 0.4)],
+        )),
+        child: SafeArea(child: Stack(children: [
+          Center(child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Center(child: Container(
+                    width: 88, height: 88,
+                    decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(28)),
+                    child: Icon(Icons.inventory_2_outlined, size: 44, color: scheme.onPrimaryContainer),
+                  )),
+                  const SizedBox(height: 24),
+                  Text('Where Did I Put It?', textAlign: TextAlign.center, style: text.headlineSmall),
+                  const SizedBox(height: 8),
+                  Text('Sign in to securely access your household inventory.', textAlign: TextAlign.center, style: text.bodyLarge?.copyWith(color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 32),
+                  SizedBox(height: 52, child: FilledButton.icon(onPressed: _busy ? null : _signInWithGoogle, icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.login), label: const Text('Continue with Google'))),
+                  if (_error != null) Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: scheme.errorContainer, borderRadius: BorderRadius.circular(12)),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Icon(Icons.error_outline, color: scheme.onErrorContainer),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(_error!, style: TextStyle(color: scheme.onErrorContainer))),
+                      ]),
+                    ),
+                  ),
+                ]),
+              ),
+            )),
+          )),
+          const Positioned(top: 8, right: 8, child: ThemeToggleButton()),
+        ])),
+      ),
+    );
+  }
 }

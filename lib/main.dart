@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'features/locations/location_repository.dart';
 import 'features/locations/locations_page.dart';
@@ -16,10 +17,16 @@ Future<void> main() async {
 class App5 extends StatelessWidget {
   const App5({super.key});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'Where Did I Put It?',
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b87)), useMaterial3: true),
-        home: const _AuthGate(),
+  Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
+        valueListenable: appThemeMode,
+        builder: (context, mode, _) => MaterialApp(
+          title: 'Where Did I Put It?',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: mode,
+          home: const _AuthGate(),
+        ),
       );
 }
 

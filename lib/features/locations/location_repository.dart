@@ -59,7 +59,8 @@ class LocationRepository {
     if (_isDemo) return Stream.value(List.unmodifiable(_items!));
     return _household.collection('items').orderBy('name').snapshots().map((snap) => snap.docs.map((doc) {
       final d = doc.data();
-      return StoredItem(id: doc.id, name: d['name'] as String? ?? 'Unnamed item', locationId: d['locationId'] as String?, category: d['category'] as String? ?? '', notes: d['notes'] as String? ?? '', activeLoanId: d['activeLoanId'] as String?);
+      final createdAt = d['createdAt'];
+      return StoredItem(id: doc.id, name: d['name'] as String? ?? 'Unnamed item', locationId: d['locationId'] as String?, category: d['category'] as String? ?? '', notes: d['notes'] as String? ?? '', activeLoanId: d['activeLoanId'] as String?, createdAt: createdAt is Timestamp ? createdAt.toDate() : null);
     }).toList());
   }
 
@@ -148,6 +149,28 @@ class LocationRepository {
       if (location != null && (await tx.get(location)).exists) tx.update(location, {'itemCount': FieldValue.increment(-1)});
       tx.delete(itemRef);
     });
+  }
+
+  CollectionReference<Map<String, dynamic>> _favorites(String uid) => _database!.collection('users').doc(uid).collection('favorites');
+
+  /// Ids of the items this user has starred in this household (users/{uid}/favorites).
+  Stream<Set<String>> watchFavoriteItemIds(String uid) {
+    if (_isDemo) return Stream.value(const <String>{});
+    return _favorites(uid).where('householdId', isEqualTo: householdId).snapshots().map((snap) => {
+      for (final doc in snap.docs)
+        if (doc.data()['itemId'] is String) doc.data()['itemId'] as String,
+    });
+  }
+
+  /// Stars or un-stars an item for this user. One document per household item.
+  Future<void> setFavorite(String uid, StoredItem item, bool favorite) async {
+    if (_isDemo) return;
+    final ref = _favorites(uid).doc('${householdId}_${item.id}');
+    if (favorite) {
+      await ref.set({'householdId': householdId, 'itemId': item.id, 'createdAt': FieldValue.serverTimestamp()});
+    } else {
+      await ref.delete();
+    }
   }
 
   static void _checkText(String value, int max, String label) { if (value.trim().length > max) throw ArgumentError('$label must be $max characters or fewer.'); }
