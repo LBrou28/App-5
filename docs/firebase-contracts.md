@@ -30,5 +30,3 @@ Student 4 is implemented: invitation/join/leave callables, account and household
 ## Security and tests
 
 Client Security Rules require household membership for reads and inventory/location writes. Memberships, user household indexes, loans and changes to item activeLoanId are server-only. Favorites are private to the user and require membership. Storage rules allow member image uploads under 5 MB. Add emulator integration tests covering outsider denial, malformed writes, concurrent loans, stale membership and returns before live deployment. The optional sharing emulator suite covers membership, forged loan writes, concurrent borrowing, returns and access after leaving. Physical-device sign-in and notification delivery still require manual checks.
-
-

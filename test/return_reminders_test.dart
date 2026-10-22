@@ -21,8 +21,9 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
           if (call.method == 'initialize') return true;
-          if (call.method == 'requestNotificationsPermission')
+          if (call.method == 'requestNotificationsPermission') {
             return permission;
+          }
           if (call.method == 'pendingNotificationRequests') return pending;
           return null;
         });

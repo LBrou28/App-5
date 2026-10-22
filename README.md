@@ -15,7 +15,7 @@ flutter pub get
 flutter run
 ```
 
-Platform projects are included for Android, iOS, macOS, and web. Android requires Android SDK; iOS and macOS require a Mac with Xcode. 
+Platform projects are included for Android, iOS, macOS, and web. Android requires Android SDK; iOS and macOS require a Mac with Xcode.
 
 ## Checks
 
@@ -44,5 +44,3 @@ From the repository root, `firebase emulators:start --project demo-app-5` runs l
 ## Sharing and borrowing
 
 Use the account menu to create/join/switch households, view members and invitations, and open Borrowed items. Google sign-in also registers new users. See [Student 4 setup and acceptance checks](docs/student-4.md) for callable deployment, emulator tests and phone reminders. These sharing/borrowing flows require deployed Cloud Functions (Blaze); they are not Spark-only.
-
-
