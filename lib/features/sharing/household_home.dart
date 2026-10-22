@@ -369,4 +369,3 @@ class _TextDialogState extends State<_TextDialog> {
     ],
   );
 }
-
