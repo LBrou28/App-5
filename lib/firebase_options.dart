@@ -66,6 +66,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '457100439912',
     projectId: 'app-5-741f2',
     storageBucket: 'app-5-741f2.firebasestorage.app',
+    androidClientId: '457100439912-h1nr64u4rlag4uj54f5fiu24fnpo2pnv.apps.googleusercontent.com',
     iosClientId: '457100439912-tv661ve2r6j8i9gqdi7ifka6a9ore3gs.apps.googleusercontent.com',
     iosBundleId: 'com.app5.app5',
   );
