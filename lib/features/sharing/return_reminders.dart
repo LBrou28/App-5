@@ -90,6 +90,16 @@ class ReturnReminders {
     }
   }
 
+  /// Remove this household's reminders without touching another household.
+  Future<void> clearHousehold(String householdId) async {
+    if (!await _initialize()) return;
+    for (final pending in await _plugin.pendingNotificationRequests()) {
+      if (pending.payload?.startsWith('$householdId/') == true) {
+        await _plugin.cancel(pending.id);
+      }
+    }
+  }
+
   Future<void> clear() async {
     if (await _initialize()) await _plugin.cancelAll();
   }

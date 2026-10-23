@@ -94,4 +94,20 @@ void main() {
       expect((cancelled.single.arguments as Map)['id'], 1);
     },
   );
+  test('leaving one household keeps other household reminders', () async {
+    pending = [
+      {'id': 1, 'title': 'Return', 'body': '', 'payload': 'home/loan'},
+      {'id': 2, 'title': 'Return', 'body': '', 'payload': 'home-other/loan'},
+      {'id': 3, 'title': 'Return', 'body': '', 'payload': 'other/loan'},
+    ];
+    await ReturnReminders().clearHousehold('home');
+    final cancelled = calls.where((call) => call.method == 'cancel').toList();
+    expect(cancelled, hasLength(1));
+    expect((cancelled.single.arguments as Map)['id'], 1);
+    expect(calls.where((call) => call.method == 'cancelAll'), isEmpty);
+  });
+  test('sign out clears all device reminders', () async {
+    await ReturnReminders().clear();
+    expect(calls.where((call) => call.method == 'cancelAll'), hasLength(1));
+  });
 }

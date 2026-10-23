@@ -282,7 +282,9 @@ class _AccountPageState extends State<AccountPage> {
                             if (leave == true) {
                               await _run(() async {
                                 await _repository.leave();
-                                await ReturnReminders.instance.clear();
+                                await ReturnReminders.instance.clearHousehold(
+                                  widget.householdId,
+                                );
                                 if (mounted) Navigator.pop(this.context);
                               });
                             }
@@ -314,8 +316,11 @@ class _AccountPageState extends State<AccountPage> {
               ? null
               : () async {
                   Navigator.pop(context);
-                  await ReturnReminders.instance.clear();
-                  await FirebaseAuth.instance.signOut();
+                  try {
+                    await ReturnReminders.instance.clear();
+                  } finally {
+                    await FirebaseAuth.instance.signOut();
+                  }
                 },
           icon: const Icon(Icons.logout),
           label: const Text('Sign out'),
