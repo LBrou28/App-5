@@ -7,15 +7,15 @@ final ValueNotifier<ThemeMode> appThemeMode = ValueNotifier(ThemeMode.dark);
 class AppTheme {
   AppTheme._();
 
-  // A warm "found it" accent and a cool organizing accent, both chosen to be
+  // A warm "found it" accent and a cool periwinkle organizing accent, both chosen to be
   // comfortable against the near-black inventory surfaces.
   static const Color _amber = Color(0xffffb35c);
-  static const Color _teal = Color(0xff76d9cf);
+  static const Color _periwinkle = Color(0xffaabfff);
   static const Color _ink = Color(0xff0b0f12);
 
   static ThemeData light() => _build(
     ColorScheme.fromSeed(seedColor: const Color(0xffb76414)).copyWith(
-      secondary: const Color(0xff006d68),
+      secondary: const Color(0xff3657ae),
       tertiary: const Color(0xff6750a4),
       surface: const Color(0xfffffbf7),
       surfaceContainerLow: const Color(0xfffff4e9),
@@ -30,10 +30,10 @@ class AppTheme {
           onPrimary: const Color(0xff3d2100),
           primaryContainer: const Color(0xff5a380a),
           onPrimaryContainer: const Color(0xffffdeb0),
-          secondary: _teal,
-          onSecondary: const Color(0xff003733),
-          secondaryContainer: const Color(0xff0b4d49),
-          onSecondaryContainer: const Color(0xffa3fff6),
+          secondary: _periwinkle,
+          onSecondary: const Color(0xff17295d),
+          secondaryContainer: const Color(0xff30477f),
+          onSecondaryContainer: const Color(0xffdee6ff),
           tertiary: const Color(0xffd1b9ff),
           onTertiary: const Color(0xff382364),
           tertiaryContainer: const Color(0xff4e387c),
