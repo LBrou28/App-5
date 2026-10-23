@@ -44,3 +44,5 @@ From the repository root, `firebase emulators:start --project demo-app-5` runs l
 ## Sharing and borrowing
 
 Use the account menu to create/join/switch households, view members and invitations, and open Borrowed items. Google sign-in also registers new users. See [Student 4 setup and acceptance checks](docs/student-4.md) for callable deployment, emulator tests and phone reminders. These sharing/borrowing flows require deployed Cloud Functions (Blaze); they are not Spark-only.
+
+For a local rehearsal before deployment, debug builds support `--dart-define=USE_FIREBASE_EMULATORS=true` with two local test accounts. The [Student 4 guide](docs/student-4.md#local-rehearsal-without-deployment) includes computer and phone setup commands.
