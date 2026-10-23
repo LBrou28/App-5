@@ -234,7 +234,6 @@ class LocationRepository {
     });
   }
 
-  /// Deletes an item that is not on loan and decrements its location's itemCount.
   Future<void> deleteItem(StoredItem item) async {
     if (_isDemo) return;
     final itemRef = _household.collection('items').doc(item.id);
