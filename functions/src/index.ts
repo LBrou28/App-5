@@ -61,7 +61,7 @@ export const borrowItem = onCall(async (request) => {
     if (!membership.exists) throw new HttpsError('permission-denied', 'Join this household first.');
     if (!snapshot.exists) throw new HttpsError('not-found', 'Item not found.');
     if (!canBorrow(snapshot.data()?.activeLoanId)) throw new HttpsError('failed-precondition', 'Item is already borrowed.');
-    transaction.set(loan, { itemId, borrower, recordedBy: userId, dueDate: Timestamp.fromMillis(dueDate), borrowedAt: FieldValue.serverTimestamp(), returnedAt: null });
+    transaction.set(loan, { itemId, itemName: snapshot.data()?.name ?? 'Unnamed item', borrower, recordedBy: userId, dueDate: Timestamp.fromMillis(dueDate), borrowedAt: FieldValue.serverTimestamp(), returnedAt: null });
     transaction.update(item, { activeLoanId: loan.id });
   });
   return { loanId: loan.id };
@@ -144,4 +144,5 @@ export const moveItem = onCall(async (request) => {
 });
 
 export { createInvitation, joinHousehold, leaveHousehold } from './sharing';
+
 

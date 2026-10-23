@@ -170,11 +170,12 @@ class _BorrowedItemsPageState extends State<BorrowedItemsPage> {
                           : null,
                     ),
                     title: Text(
-                      items
-                              .where((item) => item.id == loan.itemId)
-                              .firstOrNull
-                              ?.name ??
-                          'Removed item',
+                      loan.displayName(
+                        items
+                            .where((item) => item.id == loan.itemId)
+                            .firstOrNull
+                            ?.name,
+                      ),
                     ),
                     subtitle: Text(
                       '${loan.borrower}\nLoaned ${_date(loan.borrowedAt)} · Due ${_date(loan.dueDate)} ${TimeOfDay.fromDateTime(loan.dueDate.toLocal()).format(context)}${loan.overdueAt(DateTime.now()) ? '\nOverdue' : ''}${loan.returnedAt == null ? '' : '\nReturned ${_date(loan.returnedAt!)}'}',

@@ -46,9 +46,12 @@ test('household membership, loan concurrency and access revocation', { skip: !en
     const races = await Promise.allSettled(['owner', 'member'].map(uid => functions.borrowItem.run(request(uid, { householdId, itemId, borrower: 'Friend', dueDate: Date.now()+86400000 }))));
     assert.equal(races.filter(r => r.status === 'fulfilled').length, 1);
     assert.equal((await home.collection('loans').get()).size, 1);
+    assert.equal((await home.collection('loans').get()).docs[0].data().itemName, 'Drill');
     await functions.returnItem.run(request('member', { householdId, itemId }));
     assert.equal((await home.collection('items').doc(itemId).get()).data().activeLoanId, null);
     assert.ok((await home.collection('loans').get()).docs[0].data().returnedAt);
+    await home.collection('items').doc(itemId).update({ name: 'Renamed drill' });
+    assert.equal((await home.collection('loans').get()).docs[0].data().itemName, 'Drill');
     await assert.rejects(functions.returnItem.run(request('member', { householdId, itemId })), /no active loan/);
     await assert.rejects(functions.leaveHousehold.run(request('owner', { householdId })), /owner cannot leave/);
     await functions.leaveHousehold.run(request('member', { householdId }));
@@ -57,5 +60,6 @@ test('household membership, loan concurrency and access revocation', { skip: !en
     assert.deepEqual((await db.collection('users').doc('member').get()).data().householdIds, []);
   } finally { await environment.cleanup(); }
 });
+
 
 

@@ -49,6 +49,7 @@ class Loan {
   Loan({
     required this.id,
     required this.itemId,
+    this.itemName,
     required this.borrower,
     required this.recordedBy,
     required this.dueDate,
@@ -60,6 +61,7 @@ class Loan {
     return Loan(
       id: doc.id,
       itemId: d['itemId'] as String,
+      itemName: d['itemName'] as String?,
       borrower: d['borrower'] as String,
       recordedBy: d['recordedBy'] as String,
       dueDate: (d['dueDate'] as Timestamp).toDate(),
@@ -68,8 +70,12 @@ class Loan {
     );
   }
   final String id, itemId, borrower, recordedBy;
+  final String? itemName;
   final DateTime dueDate, borrowedAt;
   final DateTime? returnedAt;
   bool get active => returnedAt == null;
+  String displayName(String? currentName) => active
+      ? currentName ?? itemName ?? 'Removed item'
+      : itemName ?? currentName ?? 'Removed item';
   bool overdueAt(DateTime now) => active && dueDate.isBefore(now);
 }

@@ -24,4 +24,20 @@ void main() {
     expect(returned.dueDate, due);
     expect(returned.borrower, 'Alex');
   });
+  test('history keeps the recorded item name after rename or deletion', () {
+    final returned = Loan(
+      id: 'loan',
+      itemId: 'item',
+      itemName: 'Drill',
+      borrower: 'Alex',
+      recordedBy: 'member',
+      dueDate: due,
+      borrowedAt: due,
+      returnedAt: due,
+    );
+    expect(returned.displayName('Renamed drill'), 'Drill');
+    expect(returned.displayName(null), 'Drill');
+    expect(loan().displayName('Existing item'), 'Existing item');
+    expect(loan().displayName(null), 'Removed item');
+  });
 }
